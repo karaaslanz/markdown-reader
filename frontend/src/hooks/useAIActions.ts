@@ -3,6 +3,7 @@
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { editor as MonacoEditor } from "monaco-editor";
 import { AI } from "@/lib/api";
+import { applyWorkResultAsEditorEdit } from "@/lib/work-result-apply.mjs";
 import { applyWorkResultIfFresh } from "@/lib/work-result-guard.mjs";
 
 type UseAIActionsOptions = {
@@ -88,6 +89,13 @@ export function useAIActions({
     [documentText, editorRef, onDocumentChange]
   );
 
+  const applyWorkResult = useCallback(
+    (content: string) => {
+      applyWorkResultAsEditorEdit(editorRef.current, content, onDocumentChange);
+    },
+    [editorRef, onDocumentChange]
+  );
+
   const executePrompt = useCallback(
     async (prompt: string, currentDocumentText = documentText) => {
       const result = await AI.chat({
@@ -114,7 +122,7 @@ export function useAIActions({
         requestSnapshot,
         currentDocumentRef.current,
         data.modified_content,
-        onDocumentChange
+        applyWorkResult
       );
       if (!applied) {
         alert(
@@ -127,7 +135,7 @@ export function useAIActions({
     } finally {
       setIsWorking(false);
     }
-  }, [documentId, documentText, onDocumentChange]);
+  }, [applyWorkResult, documentId, documentText]);
 
   return {
     selectedText,
