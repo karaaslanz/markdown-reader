@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Markdown, type PublicationResult, type PublicationFile } from "@/lib/api";
+import { useState, useCallback, useMemo } from "react";
+import { Markdown, type PublicationResult } from "@/lib/api";
+import { currentPublicationFiles } from "@/lib/publicationSelection";
 
 interface Tab {
   id: string;
@@ -14,26 +15,18 @@ interface PublicationPanelProps {
   onClose: () => void;
 }
 
-interface SelectedFile {
-  id: string;
-  path: string;
-  content: string;
-}
-
 export default function PublicationPanel({ tabs, onClose }: PublicationPanelProps) {
-  const [selected, setSelected] = useState<SelectedFile[]>([]);
-  const [result, setResult] = useState<PublicationResult | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [result, setResult] = useState<{ data: PublicationResult; signature: string } | null>(null);
+  const selectedFiles = useMemo(() => currentPublicationFiles(selected, tabs), [selected, tabs]);
+  const selectionSignature = useMemo(() => JSON.stringify(selectedFiles), [selectedFiles]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const toggleFile = (tab: Tab) => {
     setSelected((prev) => {
-      const exists = prev.find((f) => f.id === tab.id);
-      if (exists) return prev.filter((f) => f.id !== tab.id);
-      return [
-        ...prev,
-        { id: tab.id, path: tab.filePath ?? `untitled-${tab.id}.md`, content: tab.content },
-      ];
+      if (prev.includes(tab.id)) return prev.filter((id) => id !== tab.id);
+      return [...prev, tab.id];
     });
   };
 
@@ -48,19 +41,18 @@ export default function PublicationPanel({ tabs, onClose }: PublicationPanelProp
   };
 
   const handlePrepare = useCallback(async () => {
-    if (!selected.length) return;
+    if (!selectedFiles.length) return;
     setLoading(true);
     setError(null);
     try {
-      const payload: PublicationFile[] = selected.map((f) => ({ path: f.path, content: f.content }));
-      const data = await Markdown.preparePublication(payload);
-      setResult(data);
+      const data = await Markdown.preparePublication(selectedFiles);
+      setResult({ data, signature: selectionSignature });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to prepare publication");
     } finally {
       setLoading(false);
     }
-  }, [selected]);
+  }, [selectedFiles, selectionSignature]);
 
   return (
     <aside className="w-96 border-l border-gray-200 bg-white dark:border-[#333] dark:bg-[#252526] flex flex-col">
@@ -85,7 +77,7 @@ export default function PublicationPanel({ tabs, onClose }: PublicationPanelProp
 
         <ul className="mb-4 space-y-1">
           {tabs.map((tab) => {
-            const idx = selected.findIndex((f) => f.id === tab.id);
+            const idx = selected.indexOf(tab.id);
             const isSelected = idx !== -1;
             return (
               <li
@@ -121,7 +113,7 @@ export default function PublicationPanel({ tabs, onClose }: PublicationPanelProp
 
         <button
           onClick={handlePrepare}
-          disabled={!selected.length || loading}
+          disabled={!selectedFiles.length || loading}
           className="w-full rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-50 hover:bg-blue-700"
         >
           {loading ? "Preparing…" : "Preview publication"}
@@ -129,14 +121,14 @@ export default function PublicationPanel({ tabs, onClose }: PublicationPanelProp
 
         {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
 
-        {result && (
+        {result && result.signature === selectionSignature && (
           <div className="mt-4">
             <details open>
               <summary className="cursor-pointer text-xs font-semibold">
-                Table of contents ({result.toc.length})
+                Table of contents ({result.data.toc.length})
               </summary>
               <ul className="ml-3 mt-1 text-xs">
-                {result.toc.map((h, i) => (
+                {result.data.toc.map((h, i) => (
                   <li key={i} style={{ marginLeft: (h.level - 1) * 8 }}>
                     {h.text}
                   </li>
@@ -146,7 +138,7 @@ export default function PublicationPanel({ tabs, onClose }: PublicationPanelProp
             <details className="mt-2">
               <summary className="cursor-pointer text-xs font-semibold">Combined preview</summary>
               <pre className="mt-1 max-h-64 overflow-auto rounded bg-gray-50 p-2 text-xs dark:bg-[#1e1e1e]">
-                {result.combined}
+                {result.data.combined}
               </pre>
             </details>
           </div>
