@@ -104,7 +104,7 @@ export default function HomePage() {
       onDragOver={fileIO.handleDragOver} onDrop={fileIO.handleDrop}>
       <input ref={fileIO.fileInputRef} type="file" accept={fileIO.fileInputAccept} className="hidden" onChange={fileIO.handleFileInputChange} />
       <MenuBar groups={menuGroups} shortcuts={shortcuts} />
-      <Toolbar onOpenFile={() => { void fileIO.handleOpenFile(); }} onSaveFile={() => { void handleSaveFile(); }}
+      <Toolbar onOpenFile={() => { void fileIO.handleOpenFile(); }} onOpenProject={() => { void openProject(); }} onSaveFile={() => { void handleSaveFile(); }}
         onExport={fileIO.handleExport} onOpenBrowserPreview={() => { void handleOpenBrowserPreview(); }}
         onToggleDark={() => editor.setDarkMode((dark) => !dark)} activePanel={activePanel} onTogglePanel={togglePanel}
         onToggleFocusMode={() => { setFocusMode((enabled) => !enabled); resetEditor(); }}
@@ -114,26 +114,26 @@ export default function HomePage() {
         lastExportedPath={fileIO.lastExportedPath} onShowInFinder={fileIO.showInFinder} />
       <TabBar tabs={editor.tabs} activeTabId={editor.activeTabId} onSelect={handleTabSelect} onClose={editor.closeTab} onNew={editor.newTab} />
       <div className="flex flex-1 overflow-hidden">
+        {!focusMode && <ProjectExplorer root={project.projectRoot} onOpenFile={(path) => { void editor.openFile(path); }} onOpenProject={() => { void openProject(); }} onCloseProject={project.closeProject} refreshToken={projectRefreshToken} />}
         {focusMode ? <FocusModePane key={`${editor.activeTabId}-${revision}`} value={editor.activeTab.content}
           onChange={editor.handleContentChange} darkMode={editor.darkMode} fontSize={editor.fontSize}
           slashCommands={slash.filteredCommands} onSelect={(command) => { void executeSlashCommand(command); }}
           editorRef={focusEditorRef} /> :
-          <SplitPane split={split} onSplitChange={setSplit}
+          <SplitPane split={split} onSplitChange={setSplit} minSize={20}
             left={<EditorWorkspace tabId={editor.activeTab.id} value={editor.activeTab.content}
               onChange={editor.handleContentChange} darkMode={editor.darkMode} fontSize={editor.fontSize}
               revision={revision} monacoRef={monacoRef} onReady={markReady}
               slash={{ isOpen: slash.isOpen, filteredCommands: slash.filteredCommands, selectedIndex: slash.selectedIndex,
                 position: slashMenuPosition,
                 onSelect: (command) => { void executeSlashCommand(command); }, onClose: slash.close }} />}
-            right={showPreview ? <PreviewPane html={editor.previewHtml} loading={showPackagedBackendStatus && backendStatus === "starting"}
+            right={activePanel === PANELS.PREVIEW ? <PreviewPane html={editor.previewHtml} loading={showPackagedBackendStatus && backendStatus === "starting"}
               error={showPackagedBackendStatus && backendStatus === "error" ? backendMessage : null} /> : null} />}
-        {activePanel === PANELS.AI && <AIPanel documentText={editor.activeTab.content} selectedText={selectedText} onApplyAction={handleAIApplyAction} initialTab={aiPanelInitialTab} executeWork={executeWork} isWorking={isWorking} />}
+        {activePanel === PANELS.AI && <AIPanel projectRoot={project.projectRoot} projectWork={projectWork} documentId={editor.activeTab.id} documentText={editor.activeTab.content} selectedText={selectedText} onApplyAction={handleAIApplyAction} initialTab={aiPanelInitialTab} executeWork={executeWork} isWorking={isWorking} />}
         {activePanel === PANELS.CITATION && <CitationPanel onInsert={formatting.insertCitation} />}
         {activePanel === PANELS.PUBLICATION && (
           <PublicationPanel tabs={editor.tabs} onClose={() => togglePanel(PANELS.PUBLICATION)} />
         )}
       </div>
-      <DocumentStats content={editor.activeTab.content} className="px-4 py-1 border-t" />
       <StatusBar stats={editor.wordCount} filePath={editor.activeTab.filePath} dirty={editor.activeTab.dirty} />
     </div>
   );
